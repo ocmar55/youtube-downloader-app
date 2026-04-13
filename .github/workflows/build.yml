@@ -1,5 +1,4 @@
 name: Build APK
-
 on:
   workflow_dispatch:
 
@@ -14,15 +13,19 @@ jobs:
         with:
           python-version: '3.9'
       
-      - name: Install dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt update
           sudo apt install -y python3-pip openjdk-17-jdk git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+      
+      - name: Install Buildozer
+        run: |
+          pip install --upgrade pip
           pip install buildozer cython
       
       - name: Create main.py
         run: |
-          cat > main.py << 'EOF'
+          cat > main.py << 'PYTHONCODE'
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.textinput import TextInput
@@ -33,37 +36,37 @@ from kivy.clock import Clock
 import yt_dlp
 import threading
 
-class YouTubeDownloaderApp(App):
+class YTDownloaderApp(App):
     def build(self):
         layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
         
         self.url_input = TextInput(
-            hint_text='📹 Pega la URL de YouTube aquí',
+            hint_text='Pega la URL de YouTube aqui',
             multiline=False,
             size_hint=(1, 0.15)
         )
         
         self.quality_spinner = Spinner(
-            text='🎯 Mejor Calidad',
+            text='Mejor Calidad',
             values=[
-                '🎯 Mejor Calidad',
-                '🎵 Solo Audio MP3',
-                '📱 720p HD',
-                '📱 480p SD'
+                'Mejor Calidad',
+                'Solo Audio MP3',
+                '720p HD',
+                '480p SD'
             ],
             size_hint=(1, 0.12)
         )
         
         self.download_btn = Button(
-            text='⬇️ DESCARGAR ⬇️',
+            text='DESCARGAR',
             background_color=(0, 0.8, 0, 1),
             size_hint=(1, 0.15)
         )
         self.download_btn.bind(on_press=self.start_download)
         
-        self.status = Label(text='✅ Estado: Listo', size_hint=(1, 0.1))
+        self.status = Label(text='Estado: Listo', size_hint=(1, 0.1))
         
-        layout.add_widget(Label(text='[b]YouTube Downloader Pro[/b]', markup=True, size_hint=(1, 0.1)))
+        layout.add_widget(Label(text='YouTube Downloader Pro', size_hint=(1, 0.1)))
         layout.add_widget(self.url_input)
         layout.add_widget(self.quality_spinner)
         layout.add_widget(self.download_btn)
@@ -74,7 +77,7 @@ class YouTubeDownloaderApp(App):
     def start_download(self, instance):
         url = self.url_input.text.strip()
         if not url:
-            self.status.text = '❌ Error: Ingresa URL'
+            self.status.text = 'Error: Ingresa URL'
             return
         
         self.download_btn.disabled = True
@@ -82,10 +85,10 @@ class YouTubeDownloaderApp(App):
         def download_thread():
             try:
                 quality_map = {
-                    '🎯 Mejor Calidad': 'best',
-                    '🎵 Solo Audio MP3': 'bestaudio',
-                    '📱 720p HD': 'best[height<=720]',
-                    '📱 480p SD': 'best[height<=480]'
+                    'Mejor Calidad': 'best',
+                    'Solo Audio MP3': 'bestaudio',
+                    '720p HD': 'best[height<=720]',
+                    '480p SD': 'best[height<=480]'
                 }
                 
                 format_code = quality_map.get(self.quality_spinner.text, 'best')
@@ -102,40 +105,38 @@ class YouTubeDownloaderApp(App):
                         'preferredcodec': 'mp3',
                     }]
                 
-                Clock.schedule_once(lambda dt: setattr(self.status, 'text', '📥 Descargando...'), 0)
+                Clock.schedule_once(lambda dt: setattr(self.status, 'text', 'Descargando...'), 0)
                 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
                     titulo = info.get('title', 'Video')
                     
-                    Clock.schedule_once(lambda dt: setattr(self.status, 'text', f'✅ Completado: {titulo[:30]}'), 0)
+                    Clock.schedule_once(lambda dt: setattr(self.status, 'text', 'Completado: ' + titulo[:30]), 0)
                     
             except Exception as e:
-                Clock.schedule_once(lambda dt: setattr(self.status, 'text', f'❌ Error: {str(e)[:50]}'), 0)
+                Clock.schedule_once(lambda dt: setattr(self.status, 'text', 'Error: ' + str(e)[:50]), 0)
             finally:
                 Clock.schedule_once(lambda dt: setattr(self.download_btn, 'disabled', False), 0)
         
         threading.Thread(target=download_thread).start()
 
 if __name__ == '__main__':
-    YouTubeDownloaderApp().run()
-EOF
+    YTDownloaderApp().run()
+PYTHONCODE
       
       - name: Create buildozer.spec
         run: |
-          cat > buildozer.spec << 'EOF'
+          cat > buildozer.spec << 'SPECFILE'
 [app]
-title = YouTube Downloader Pro
-package.name = youtubedownloader
-package.domain = org.ytdownloader
+title = YT Downloader Pro
+package.name = ytdownloaderpro
+package.domain = org.downloader
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 version = 1.0.0
 requirements = python3,kivy,yt-dlp
 orientation = portrait
 fullscreen = 0
-
-[app]
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
 android.api = 30
 android.minapi = 21
@@ -145,9 +146,9 @@ android.sdk = 30
 [buildozer]
 log_level = 2
 warn_on_root = 1
-EOF
+SPECFILE
       
-      - name: Initialize buildozer
+      - name: Initialize Buildozer
         run: buildozer init
       
       - name: Build APK
@@ -156,5 +157,5 @@ EOF
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: YouTube-Downloader-APK
+          name: YTDownloaderApp
           path: bin/*.apk
