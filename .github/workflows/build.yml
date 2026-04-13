@@ -1,0 +1,89 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      
+      - name: Install buildozer
+        run: |
+          sudo apt update
+          sudo apt install -y python3-pip openjdk-17-jdk
+          pip install buildozer
+      
+      - name: Create app
+        run: |
+          echo 'from kivy.app import App
+          from kivy.uix.boxlayout import BoxLayout
+          from kivy.uix.textinput import TextInput
+          from kivy.uix.button import Button
+          from kivy.uix.label import Label
+          import yt_dlp
+          import threading
+          
+          class YTDLApp(App):
+              def build(self):
+                  layout = BoxLayout(orientation="vertical", padding=20)
+                  self.url = TextInput(hint_text="Pega URL de YouTube")
+                  self.btn = Button(text="DESCARGAR", background_color=(0,1,0,1))
+                  self.status = Label(text="Estado: Listo")
+                  self.btn.bind(on_press=self.descargar)
+                  layout.add_widget(self.url)
+                  layout.add_widget(self.btn)
+                  layout.add_widget(self.status)
+                  return layout
+              
+              def descargar(self, instance):
+                  url = self.url.text.strip()
+                  if not url:
+                      self.status.text = "Error: Ingresa URL"
+                      return
+                  self.btn.disabled = True
+                  self.status.text = "Descargando..."
+                  def tarea():
+                      try:
+                          opts = {"outtmpl": "/storage/emulated/0/Download/%(title)s.%(ext)s", "format": "best", "quiet": True}
+                          with yt_dlp.YoutubeDL(opts) as ydl:
+                              ydl.extract_info(url, download=True)
+                          self.status.text = "Completado!"
+                      except Exception as e:
+                          self.status.text = f"Error: {str(e)[:50]}"
+                      finally:
+                          self.btn.disabled = False
+                  threading.Thread(target=tarea).start()
+          
+          if __name__ == "__main__":
+              YTDLApp().run()' > main.py
+      
+      - name: Create spec file
+        run: |
+          echo '[app]
+          title = YT Downloader
+          package.name = ytdownloader
+          package.domain = org.yt
+          requirements = python3,kivy,yt-dlp
+          android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE
+          android.api = 30
+          
+          [buildozer]
+          log_level = 2' > buildozer.spec
+      
+      - name: Build APK
+        run: |
+          buildozer init
+          buildozer android debug
+      
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: YT-Downloader
+          path: bin/*.apk
